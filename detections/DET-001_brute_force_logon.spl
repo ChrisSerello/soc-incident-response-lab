@@ -1,0 +1,24 @@
+| Detection: DET-001 — Brute Force Logon Attempts
+| Description: Detects 10 or more failed Windows logon attempts (Event ID 4625)
+|              from the same source IP within a 5-minute window.
+| Technique: T1110.001 — Brute Force: Password Guessing
+| Severity: High
+| Log Source: Windows Security Event Log
+| Required Fields: EventCode, src_ip, user
+
+index=windows sourcetype="WinEventLog:Security" EventCode=4625
+| bucket _time span=5m
+| stats
+    count AS failed_attempts,
+    dc(user) AS distinct_users,
+    values(user) AS attempted_users,
+    first(_time) AS first_attempt,
+    last(_time) AS last_attempt
+    BY src_ip, _time
+| where failed_attempts >= 10
+| eval first_attempt=strftime(first_attempt, "%Y-%m-%d %H:%M:%S")
+| eval last_attempt=strftime(last_attempt, "%Y-%m-%d %H:%M:%S")
+| eval detection_id="DET-001"
+| eval severity="High"
+| table detection_id, severity, src_ip, failed_attempts, distinct_users, attempted_users, first_attempt, last_attempt
+| sort -failed_attempts
