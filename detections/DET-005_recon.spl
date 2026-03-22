@@ -1,0 +1,48 @@
+| Detection: DET-005 — Internal Reconnaissance Commands
+| Description: Detects execution of common Windows reconnaissance commands
+|              (net user, net group, whoami, ipconfig, systeminfo, tasklist, etc.)
+|              These are frequently used by attackers after initial access to
+|              enumerate the environment before lateral movement or privilege escalation.
+| Technique: T1082 — System Information Discovery
+|            T1087 — Account Discovery
+|            T1049 — System Network Connections Discovery
+| Severity: Medium
+| Log Source: Windows Security (EventCode=4688) + Sysmon (EventCode=1)
+| Required Fields: EventCode, CommandLine, Image, host, user
+
+index=windows
+    (sourcetype="WinEventLog:Security" EventCode=4688)
+    OR (sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=1)
+| eval cmdline=lower(coalesce(CommandLine, process))
+| eval process_name=lower(coalesce(Image, process_name))
+| where
+    match(cmdline, "net\s+(user|group|localgroup|accounts|view|use|session|share)")
+    OR match(cmdline, "whoami")
+    OR match(cmdline, "ipconfig")
+    OR match(cmdline, "systeminfo")
+    OR match(cmdline, "tasklist")
+    OR match(cmdline, "netstat")
+    OR match(cmdline, "arp\s+-a")
+    OR match(cmdline, "hostname")
+    OR match(cmdline, "nltest")
+    OR match(cmdline, "wmic")
+| eval recon_category=case(
+    match(cmdline, "net\s+(user|group|localgroup)"), "Account Discovery",
+    match(cmdline, "whoami"), "User Context",
+    match(cmdline, "ipconfig|arp|netstat"), "Network Discovery",
+    match(cmdline, "systeminfo|hostname"), "System Info Discovery",
+    match(cmdline, "tasklist|wmic"), "Process Discovery",
+    1=1, "General Recon"
+)
+| eval _time_fmt=strftime(_time, "%Y-%m-%d %H:%M:%S")
+| eval detection_id="DET-005"
+| eval severity="Medium"
+| stats
+    count AS recon_count,
+    values(recon_category) AS categories,
+    values(cmdline) AS commands,
+    min(_time_fmt) AS first_seen,
+    max(_time_fmt) AS last_seen
+    BY detection_id, severity, host, user
+| where recon_count >= 2
+| sort -recon_count
