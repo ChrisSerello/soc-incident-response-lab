@@ -1,4 +1,4 @@
-# Laboratório SOC — Resposta a Incidentes
+# Laboratório SOC - Resposta a Incidentes
 
 ![Splunk](https://img.shields.io/badge/Splunk-SIEM-blue) ![Status](https://img.shields.io/badge/Status-Ativo-green) ![Licença](https://img.shields.io/badge/Licença-MIT-yellow)
 
