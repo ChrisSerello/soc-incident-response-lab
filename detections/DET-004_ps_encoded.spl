@@ -1,0 +1,24 @@
+| Detection: DET-004 — Encoded PowerShell Execution
+| Description: Detects PowerShell processes invoked with the -EncodedCommand
+|              or -enc flag, commonly used to obfuscate malicious commands and
+|              evade simple string-based detection.
+| Technique: T1027 — Obfuscated Files or Information
+|            T1059.001 — PowerShell
+| Severity: High
+| Log Source: Windows Security (EventCode=4688) + Sysmon (EventCode=1)
+| Required Fields: EventCode, CommandLine, ParentCommandLine, host, user
+
+index=windows
+    (sourcetype="WinEventLog:Security" EventCode=4688)
+    OR (sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=1)
+| eval cmdline=coalesce(CommandLine, process)
+| where match(lower(cmdline), "powershell") AND match(lower(cmdline), "-enc(odedcommand)?\s+[a-zA-Z0-9+/=]{20,}")
+| eval _time_fmt=strftime(_time, "%Y-%m-%d %H:%M:%S")
+| eval detection_id="DET-004"
+| eval severity="High"
+| eval technique="T1027 / T1059.001"
+| rex field=cmdline "(?i)-enc(?:odedcommand)?\s+(?P<encoded_payload>[A-Za-z0-9+/=]{20,})"
+| eval decoded_attempt=base64decode(encoded_payload)
+| table detection_id, severity, technique, _time_fmt, host, user, cmdline, encoded_payload, decoded_attempt
+| rename _time_fmt AS timestamp
+| sort -_time
