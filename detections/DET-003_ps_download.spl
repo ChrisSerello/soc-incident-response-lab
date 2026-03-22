@@ -1,0 +1,21 @@
+| Detection: DET-003 — PowerShell Download Cradle
+| Description: Detects PowerShell processes (Event ID 4688/4104) using download
+|              cradle keywords such as Invoke-WebRequest, WebClient, DownloadString,
+|              DownloadFile, or curl/wget equivalents via PowerShell.
+| Technique: T1059.001 — Command and Scripting Interpreter: PowerShell
+| Severity: High
+| Log Source: Windows Security (4688) + PowerShell Operational (4104)
+| Required Fields: EventCode, CommandLine, ScriptBlockText, host
+
+index=windows (sourcetype="WinEventLog:Security" EventCode=4688 Image="*powershell*")
+OR (sourcetype="WinEventLog:Microsoft-Windows-PowerShell/Operational" EventCode=4104)
+| eval cmdline=coalesce(CommandLine, ScriptBlockText)
+| where match(lower(cmdline), "invoke-webrequest|downloadstring|downloadfile|webclient|new-object.*net\.webclient|curl |wget |iwr |iex.*http")
+| eval _time_fmt=strftime(_time, "%Y-%m-%d %H:%M:%S")
+| eval detection_id="DET-003"
+| eval severity="High"
+| eval technique="T1059.001"
+| rex field=cmdline "(?i)(https?://[^\s'\"]+)" AS download_url
+| table detection_id, severity, technique, _time_fmt, host, user, cmdline, download_url
+| rename _time_fmt AS timestamp
+| sort -_time
