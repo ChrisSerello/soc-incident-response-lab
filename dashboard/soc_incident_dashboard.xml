@@ -1,0 +1,254 @@
+<dashboard version="1.1" theme="dark">
+  <label>SOC Incident Response Lab — IR-2026-001</label>
+  <description>Security Operations Center dashboard for monitoring brute force attacks, PowerShell abuse, and internal reconnaissance. Lab exercise based on simulated Windows environment.</description>
+
+  <!-- ============================================================ -->
+  <!-- ROW 1: Summary KPIs                                          -->
+  <!-- ============================================================ -->
+  <row>
+    <panel>
+      <single>
+        <title>Failed Logon Attempts (Last 24h)</title>
+        <search>
+          <query>index=windows sourcetype="WinEventLog:Security" EventCode=4625 | stats count</query>
+          <earliest>-24h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x65A637","0xF58F39","0xD93F3C"]</option>
+        <option name="rangeValues">[10,50]</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+    <panel>
+      <single>
+        <title>Successful Logons After Failures (Last 24h)</title>
+        <search>
+          <query>
+            index=windows sourcetype="WinEventLog:Security" EventCode=4625
+            | stats count AS fails, max(_time) AS last_fail BY src_ip
+            | where fails >= 5
+            | join type=inner src_ip
+                [ search index=windows sourcetype="WinEventLog:Security" EventCode=4624
+                | stats count AS success BY src_ip ]
+            | stats count
+          </query>
+          <earliest>-24h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x65A637","0xD93F3C"]</option>
+        <option name="rangeValues">[0]</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+    <panel>
+      <single>
+        <title>PowerShell Suspicious Executions (Last 24h)</title>
+        <search>
+          <query>
+            index=windows
+              (sourcetype="WinEventLog:Security" EventCode=4688 Image="*powershell*")
+              OR (sourcetype="WinEventLog:Microsoft-Windows-PowerShell/Operational" EventCode=4104)
+            | eval cmdline=coalesce(CommandLine, ScriptBlockText)
+            | where match(lower(cmdline), "invoke-webrequest|downloadstring|encodedcommand|-enc\s")
+            | stats count
+          </query>
+          <earliest>-24h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x65A637","0xD93F3C"]</option>
+        <option name="rangeValues">[0]</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+    <panel>
+      <single>
+        <title>Recon Commands Detected (Last 24h)</title>
+        <search>
+          <query>
+            index=windows sourcetype="WinEventLog:Security" EventCode=4688
+            | eval cmdline=lower(CommandLine)
+            | where match(cmdline, "whoami|net user|ipconfig|systeminfo|tasklist|netstat")
+            | stats count
+          </query>
+          <earliest>-24h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x65A637","0xF58F39","0xD93F3C"]</option>
+        <option name="rangeValues">[5,20]</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+  </row>
+
+  <!-- ============================================================ -->
+  <!-- ROW 2: Brute Force Timeline                                  -->
+  <!-- ============================================================ -->
+  <row>
+    <panel>
+      <chart>
+        <title>DET-001 | Failed Logon Attempts Over Time (EventCode 4625)</title>
+        <search>
+          <query>
+            index=windows sourcetype="WinEventLog:Security" EventCode=4625
+            | timechart span=5m count AS "Failed Logons" BY src_ip
+          </query>
+          <earliest>-24h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.axisTitleX.text">Time</option>
+        <option name="charting.axisTitleY.text">Failed Logon Count</option>
+        <option name="charting.legend.placement">bottom</option>
+      </chart>
+    </panel>
+    <panel>
+      <table>
+        <title>DET-002 | Brute Force Success — Top Attackers</title>
+        <search>
+          <query>
+            index=windows sourcetype="WinEventLog:Security" EventCode=4625
+            | stats count AS failed_attempts BY src_ip
+            | where failed_attempts >= 10
+            | sort -failed_attempts
+            | head 10
+          </query>
+          <earliest>-24h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="drilldown">cell</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- ============================================================ -->
+  <!-- ROW 3: PowerShell Activity                                   -->
+  <!-- ============================================================ -->
+  <row>
+    <panel>
+      <table>
+        <title>DET-003 | PowerShell Download Cradle Events</title>
+        <search>
+          <query>
+            index=windows
+              (sourcetype="WinEventLog:Security" EventCode=4688 Image="*powershell*")
+              OR (sourcetype="WinEventLog:Microsoft-Windows-PowerShell/Operational" EventCode=4104)
+            | eval cmdline=coalesce(CommandLine, ScriptBlockText)
+            | where match(lower(cmdline), "invoke-webrequest|downloadstring|downloadfile|webclient|iex.*http")
+            | eval time=strftime(_time, "%Y-%m-%d %H:%M:%S")
+            | table time, host, user, cmdline
+            | sort -time
+          </query>
+          <earliest>-24h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="drilldown">cell</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+    <panel>
+      <table>
+        <title>DET-004 | Encoded PowerShell Executions</title>
+        <search>
+          <query>
+            index=windows
+              (sourcetype="WinEventLog:Security" EventCode=4688)
+              OR (sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=1)
+            | eval cmdline=coalesce(CommandLine, process)
+            | where match(lower(cmdline), "powershell") AND match(lower(cmdline), "-enc")
+            | eval time=strftime(_time, "%Y-%m-%d %H:%M:%S")
+            | table time, host, user, cmdline
+            | sort -time
+          </query>
+          <earliest>-24h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="drilldown">cell</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- ============================================================ -->
+  <!-- ROW 4: Reconnaissance Activity                              -->
+  <!-- ============================================================ -->
+  <row>
+    <panel>
+      <chart>
+        <title>DET-005 | Recon Commands by Type</title>
+        <search>
+          <query>
+            index=windows sourcetype="WinEventLog:Security" EventCode=4688
+            | eval cmdline=lower(CommandLine)
+            | eval recon_type=case(
+                match(cmdline,"net\s+user|net\s+group"), "Account Discovery",
+                match(cmdline,"whoami"), "User Context",
+                match(cmdline,"ipconfig|netstat|arp"), "Network Discovery",
+                match(cmdline,"systeminfo|hostname"), "System Info",
+                match(cmdline,"tasklist|wmic"), "Process Discovery",
+                true(), null()
+            )
+            | where isnotnull(recon_type)
+            | stats count BY recon_type
+          </query>
+          <earliest>-24h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="charting.chart">pie</option>
+        <option name="charting.legend.placement">right</option>
+      </chart>
+    </panel>
+    <panel>
+      <table>
+        <title>DET-005 | Recon Command Details</title>
+        <search>
+          <query>
+            index=windows sourcetype="WinEventLog:Security" EventCode=4688
+            | eval cmdline=lower(CommandLine)
+            | where match(cmdline, "whoami|net user|net group|ipconfig|systeminfo|tasklist|netstat")
+            | eval time=strftime(_time, "%Y-%m-%d %H:%M:%S")
+            | table time, host, user, CommandLine
+            | sort -time
+          </query>
+          <earliest>-24h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="drilldown">cell</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- ============================================================ -->
+  <!-- ROW 5: Attack Timeline                                       -->
+  <!-- ============================================================ -->
+  <row>
+    <panel>
+      <chart>
+        <title>Full Attack Timeline — All Detection Events</title>
+        <search>
+          <query>
+            index=windows sourcetype="WinEventLog:Security" (EventCode=4625 OR EventCode=4624 OR EventCode=4688)
+            | eval event_type=case(
+                EventCode=4625, "Failed Logon",
+                EventCode=4624, "Successful Logon",
+                EventCode=4688, "Process Created"
+            )
+            | timechart span=1m count BY event_type
+          </query>
+          <earliest>-24h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="charting.chart">line</option>
+        <option name="charting.axisTitleX.text">Time</option>
+        <option name="charting.axisTitleY.text">Event Count</option>
+        <option name="charting.legend.placement">bottom</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+      </chart>
+    </panel>
+  </row>
+
+</dashboard>
