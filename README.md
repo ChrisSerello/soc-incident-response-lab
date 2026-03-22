@@ -1,101 +1,133 @@
-# SOC Incident Response Lab
+# Laboratório SOC — Resposta a Incidentes
 
-![Splunk](https://img.shields.io/badge/Splunk-SIEM-blue) ![Status](https://img.shields.io/badge/Status-Active-green) ![License](https://img.shields.io/badge/License-MIT-yellow)
+![Splunk](https://img.shields.io/badge/Splunk-SIEM-blue) ![Status](https://img.shields.io/badge/Status-Ativo-green) ![Licença](https://img.shields.io/badge/Licença-MIT-yellow)
 
-## Overview
+## O que é isso
 
-This repository documents a hands-on SOC (Security Operations Center) lab exercise simulating a real-world attack scenario and the full incident response lifecycle. The lab environment uses **Splunk** as the primary SIEM platform.
+Esse repositório documenta um laboratório de resposta a incidentes que montei do zero na minha própria máquina. O cenário simula um ataque real em duas fases: brute force seguido de execução de PowerShell malicioso.
 
-The simulated incident covers:
-- Brute force login attempts against a Windows host
-- Successful unauthorized access
-- PowerShell-based payload download
-- Encoded PowerShell execution (obfuscation technique)
-- Internal reconnaissance activity
+Tudo foi construído com Splunk Enterprise rodando direto no Windows (sem VM externa, sem servidor dedicado), coletando logs de Security e PowerShell Operational.
 
-## Repository Structure
+O incidente simulado cobre:
+
+- Tentativas de brute force contra uma conta Windows local
+- Acesso bem-sucedido após várias falhas
+- Download de payload via PowerShell
+- Execução de comando PowerShell ofuscado em Base64
+- Reconhecimento interno (whoami, ipconfig)
+
+---
+
+## Estrutura do repositório
 
 ```
 soc-incident-response-lab/
-├── README.md                        # This file
-├── INCIDENT_REPORT.md               # Full incident report (IR-2026-001)
-├── detections/                      # Splunk SPL detection queries
-│   ├── DET-001_brute_force_logon.spl    # Multiple failed logon attempts
-│   ├── DET-002_brute_force_success.spl  # Failed logons followed by success
-│   ├── DET-003_ps_download.spl          # PowerShell download cradle activity
-│   ├── DET-004_ps_encoded.spl           # Encoded PowerShell command detection
-│   └── DET-005_recon.spl                # Internal reconnaissance (net/ipconfig)
+├── README.md                    # Este arquivo
+├── INCIDENT_REPORT.md          # Relatório completo do incidente (INC-2026-001)
+├── detections/                 # Queries SPL de detecção
+│   ├── DET-001_brute_force_logon.spl
+│   ├── DET-002_brute_force_success.spl
+│   ├── DET-003_ps_download.spl
+│   ├── DET-004_ps_encoded.spl
+│   └── DET-005_recon.spl
 ├── dashboard/
-│   └── soc_incident_dashboard.xml   # Splunk dashboard XML (importable)
+│   └── soc_incident_dashboard.xml  # Dashboard importável no Splunk
 ├── configs/
-│   └── inputs.conf                  # Splunk universal forwarder config
+│   └── inputs.conf             # Configuração do forwarder
 └── screenshots/
-    ├── dashboard.png                # SOC dashboard view
-    ├── det001.png                   # Detection DET-001 results
-    └── timeline.png                 # Attack timeline visualization
+    ├── dashboard.png
+    ├── det001.png
+    └── timeline.png
 ```
 
-## Attack Timeline
+---
 
-| Time (UTC) | Event | Detection |
-|---|---|---|
-| 2026-03-20 02:14 | Brute force begins (192.168.1.105 → WINHOST01) | DET-001 |
-| 2026-03-20 02:31 | Successful logon after 47 failures | DET-002 |
-| 2026-03-20 02:33 | PowerShell download cradle executed | DET-003 |
-| 2026-03-20 02:34 | Encoded PowerShell command run | DET-004 |
-| 2026-03-20 02:37 | Internal recon commands observed | DET-005 |
+## Timeline do ataque
 
-## Detection Coverage
+| Horário | O que aconteceu | Detecção |
+|---------|----------------|----------|
+| 12:45:00 | 8 tentativas de logon com falha em 1 minuto | DET-001 |
+| 12:45:57 | Logon bem-sucedido após as falhas | DET-002 |
+| 12:46:19 | PowerShell tentando baixar payload externo | DET-003 |
+| 12:46:32 | Reconhecimento: whoami + ipconfig | DET-005 |
+| 12:46:51 | Execução de comando PowerShell codificado em Base64 | DET-004 |
 
-| ID | Detection Name | Technique (MITRE ATT&CK) | Severity |
-|---|---|---|---|
-| DET-001 | Brute Force Logon Attempts | T1110.001 - Password Guessing | High |
-| DET-002 | Brute Force Followed by Success | T1110.001 - Password Guessing | Critical |
-| DET-003 | PowerShell Download Cradle | T1059.001 - PowerShell | High |
-| DET-004 | Encoded PowerShell Execution | T1027 - Obfuscated Files | High |
-| DET-005 | Internal Reconnaissance | T1082 - System Info Discovery | Medium |
+---
 
-## Lab Environment
+## As 5 detecções
 
-- **SIEM:** Splunk Enterprise (local instance)
-- **Log Sources:** Windows Event Logs (Security, System, PowerShell/Operational)
-- **Simulated Host:** WINHOST01 (Windows 10)
-- **Attack Source IP:** 192.168.1.105
-- **Event IDs monitored:** 4625, 4624, 4688, 4104
+Cada detecção foi mapeada para uma técnica do MITRE ATT&CK:
 
-## How to Use
+| ID | Nome da Detecção | Técnica MITRE ATT&CK | Severidade |
+|----|-----------------|---------------------|------------|
+| DET-001 | Spike de Brute Force | T1110.001 — Password Guessing | Alta |
+| DET-002 | Brute Force com Sucesso | T1110.001 — Password Guessing | Crítica |
+| DET-003 | Download via PowerShell | T1059.001 — PowerShell | Alta |
+| DET-004 | PowerShell Ofuscado | T1027 — Obfuscated Files | Alta |
+| DET-005 | Reconhecimento Interno | T1082 — System Info Discovery | Média |
 
-### Import the Dashboard
-1. Open Splunk Web → Dashboards → Create New Dashboard
-2. Select **Classic Dashboard**
-3. Click **Source** and paste the contents of `dashboard/soc_incident_dashboard.xml`
-4. Save and view
+Todas as queries estão na pasta `detections/` com comentários explicando cada comando SPL usado.
 
-### Run Detection Queries
-1. Open Splunk → Search & Reporting
-2. Copy and paste any `.spl` file from `detections/`
-3. Adjust the time range as needed
+---
 
-### Configure the Forwarder
-1. Place `configs/inputs.conf` in `$SPLUNK_HOME/etc/system/local/`
-2. Restart the Splunk Universal Forwarder
+## Ambiente do laboratório
 
-## Incident Report
+- **SIEM:** Splunk Enterprise 10.2.1
+- **Fontes de log:** Windows Security, System, PowerShell/Operational
+- **Host simulado:** Serello (Windows 11)
+- **Event IDs monitorados:** 4625 (falha de logon), 4624 (logon sucesso), 4104 (Script Block Logging do PowerShell)
+- **Hardware:** 8GB RAM — tudo rodando localmente
 
-See [INCIDENT_REPORT.md](./INCIDENT_REPORT.md) for the full structured incident report including:
-- Executive Summary
-- Indicators of Compromise (IOCs)
-- Timeline of Events
-- Containment & Remediation Actions
-- Lessons Learned
+---
 
-## References
+## Como usar
+
+### Importar o dashboard no Splunk
+
+1. Abre o Splunk Web → **Dashboards** → **Create New Dashboard**
+2. Escolhe **Classic Dashboard**
+3. Clica em **Source** e cola o conteúdo de `dashboard/soc_incident_dashboard.xml`
+4. Salva e visualiza
+
+### Rodar as detecções
+
+1. Abre o Splunk → **Search & Reporting**
+2. Copia qualquer arquivo `.spl` da pasta `detections/`
+3. Ajusta o time range se necessário (Last 4 hours funciona bem)
+4. Roda a query
+
+### Configurar o forwarder
+
+1. Copia `configs/inputs.conf` para `$SPLUNK_HOME/etc/system/local/`
+2. Reinicia o Splunk Universal Forwarder
+
+---
+
+## Relatório de incidente
+
+O arquivo `INCIDENT_REPORT.md` documenta o ciclo completo de resposta ao incidente seguindo:
+
+- **NIST SP 800-61** (4 fases de resposta)
+- **NIST CSF 2.0** (Identify / Protect / Detect / Respond / Recover)
+- **ISO 27035** (gestão de incidentes)
+- **CIS Controls v8** (gaps identificados + recomendações)
+
+Inclui:
+- Sumário executivo
+- Indicadores de comprometimento (IoCs)
+- Timeline completa dos eventos
+- Ações de contenção e erradicação
+- Lições aprendidas
+
+---
+
+## Referências
 
 - [MITRE ATT&CK Framework](https://attack.mitre.org/)
 - [Splunk Security Essentials](https://splunkbase.splunk.com/app/3435)
-- [NIST SP 800-61 — Computer Security Incident Handling Guide](https://csrc.nist.gov/publications/detail/sp/800-61/rev-2/final)
+- [NIST SP 800-61 — Guia de Resposta a Incidentes](https://csrc.nist.gov/publications/detail/sp/800-61/rev-2/final)
 - [Windows Security Event IDs](https://www.ultimatewindowssecurity.com/securitylog/encyclopedia/)
 
 ---
 
-*Lab created as part of SOC/Blue Team certification study. All activity is simulated in an isolated environment.*
+Laboratório criado como parte do estudo para certificações Blue Team/SOC. Toda a atividade foi simulada em ambiente isolado.
