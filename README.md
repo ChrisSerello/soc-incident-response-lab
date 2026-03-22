@@ -18,30 +18,6 @@ O incidente simulado cobre:
 
 ---
 
-## Estrutura do repositório
-
-```
-soc-incident-response-lab/
-├── README.md                    # Este arquivo
-├── INCIDENT_REPORT.md          # Relatório completo do incidente (INC-2026-001)
-├── detections/                 # Queries SPL de detecção
-│   ├── DET-001_brute_force_logon.spl
-│   ├── DET-002_brute_force_success.spl
-│   ├── DET-003_ps_download.spl
-│   ├── DET-004_ps_encoded.spl
-│   └── DET-005_recon.spl
-├── dashboard/
-│   └── soc_incident_dashboard.xml  # Dashboard importável no Splunk
-├── configs/
-│   └── inputs.conf             # Configuração do forwarder
-└── screenshots/
-    ├── dashboard.png
-    ├── det001.png
-    └── timeline.png
-```
-
----
-
 ## Timeline do ataque
 
 | Horário | O que aconteceu | Detecção |
@@ -66,7 +42,7 @@ Cada detecção foi mapeada para uma técnica do MITRE ATT&CK:
 | DET-004 | PowerShell Ofuscado | T1027 — Obfuscated Files | Alta |
 | DET-005 | Reconhecimento Interno | T1082 — System Info Discovery | Média |
 
-Todas as queries estão na pasta `detections/` com comentários explicando cada comando SPL usado.
+Todas as queries estão na pasta detections/ com comentários explicando cada comando SPL usado.
 
 ---
 
@@ -84,28 +60,28 @@ Todas as queries estão na pasta `detections/` com comentários explicando cada 
 
 ### Importar o dashboard no Splunk
 
-1. Abre o Splunk Web → **Dashboards** → **Create New Dashboard**
+1. Abre o Splunk Web - **Dashboards** - **Create New Dashboard**
 2. Escolhe **Classic Dashboard**
-3. Clica em **Source** e cola o conteúdo de `dashboard/soc_incident_dashboard.xml`
+3. Clica em **Source** e cola o conteúdo de: dashboard/soc_incident_dashboard.xml
 4. Salva e visualiza
 
 ### Rodar as detecções
 
-1. Abre o Splunk → **Search & Reporting**
-2. Copia qualquer arquivo `.spl` da pasta `detections/`
+1. Abre o Splunk - **Search & Reporting**
+2. Copia qualquer arquivo .spl da pasta: detections/
 3. Ajusta o time range se necessário (Last 4 hours funciona bem)
 4. Roda a query
 
 ### Configurar o forwarder
 
-1. Copia `configs/inputs.conf` para `$SPLUNK_HOME/etc/system/local/`
+1. Copia configs/inputs.conf para $SPLUNK_HOME/etc/system/local/
 2. Reinicia o Splunk Universal Forwarder
 
 ---
 
 ## Relatório de incidente
 
-O arquivo `INCIDENT_REPORT.md` documenta o ciclo completo de resposta ao incidente seguindo:
+O arquivo INCIDENT_REPORT.md documenta o ciclo completo de resposta ao incidente seguindo:
 
 - **NIST SP 800-61** (4 fases de resposta)
 - **NIST CSF 2.0** (Identify / Protect / Detect / Respond / Recover)
